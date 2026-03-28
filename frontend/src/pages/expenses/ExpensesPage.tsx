@@ -1,7 +1,8 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
+import { categoryApi } from "../../api/category";
 import { expenseApi } from "../../api/expense";
 import ExpenseForm from "../../components/expenses/ExpenseForm";
-import type { Expense, ExpenseCreate, ExpenseStats } from "../../types";
+import type { Category, Expense, ExpenseCreate } from "../../types";
 import {
   BarChart,
   Bar,
@@ -12,26 +13,113 @@ import {
   ResponsiveContainer,
 } from "recharts";
 
+function toYearMonth(dateStr: string) {
+  return dateStr.slice(0, 7);
+}
+
+function monthLabel(ym: string) {
+  const [y, m] = ym.split("-").map(Number);
+  return new Date(y, m - 1, 1).toLocaleString("default", { month: "long", year: "numeric" });
+}
+
+function fmt(amount: number) {
+  return `₹${amount.toLocaleString("en-IN")}`;
+}
+
 export default function ExpensesPage() {
   const [expenses, setExpenses] = useState<Expense[]>([]);
-  const [stats, setStats] = useState<ExpenseStats | null>(null);
+  const [categories, setCategories] = useState<Category[]>([]);
   const [showForm, setShowForm] = useState(false);
   const [editing, setEditing] = useState<Expense | null>(null);
+  const [showNewCategory, setShowNewCategory] = useState(false);
+  const [newCategoryName, setNewCategoryName] = useState("");
+  const [categoryError, setCategoryError] = useState("");
   const [error, setError] = useState("");
+
+  const currentMonth = toYearMonth(new Date().toISOString().slice(0, 10));
+  const [selectedMonth, setSelectedMonth] = useState(currentMonth);
 
   async function load() {
     try {
-      const [e, s] = await Promise.all([expenseApi.list(), expenseApi.stats()]);
+      const [e, c] = await Promise.all([expenseApi.list(), categoryApi.list()]);
       setExpenses(e);
-      setStats(s);
+      setCategories(c);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to load");
     }
   }
 
-  useEffect(() => {
-    load();
-  }, []);
+  useEffect(() => { load(); }, []);
+
+  async function handleCreateCategory(e: React.FormEvent) {
+    e.preventDefault();
+    setCategoryError("");
+    try {
+      await categoryApi.create(newCategoryName.trim());
+      setNewCategoryName("");
+      setShowNewCategory(false);
+      setCategories(await categoryApi.list());
+    } catch (err) {
+      setCategoryError(err instanceof Error ? err.message : "Failed to create");
+    }
+  }
+
+  // split income vs spend
+  const incomeRows = useMemo(() => expenses.filter((e) => e.category === "income"), [expenses]);
+  const spendRows  = useMemo(() => expenses.filter((e) => e.category !== "income"), [expenses]);
+
+  // top-line stats
+  const currentMonthSpend = useMemo(() =>
+    spendRows
+      .filter((e) => toYearMonth(e.date) === currentMonth)
+      .reduce((s, e) => s + parseFloat(e.amount), 0),
+    [spendRows, currentMonth]
+  );
+
+  const currentMonthIncome = useMemo(() =>
+    incomeRows
+      .filter((e) => toYearMonth(e.date) === currentMonth)
+      .reduce((s, e) => s + parseFloat(e.amount), 0),
+    [incomeRows, currentMonth]
+  );
+
+  const avgMonthlySpend = useMemo(() => {
+    const byMonth: Record<string, number> = {};
+    spendRows.forEach((e) => {
+      const ym = toYearMonth(e.date);
+      byMonth[ym] = (byMonth[ym] || 0) + parseFloat(e.amount);
+    });
+    const months = Object.values(byMonth);
+    return months.length ? months.reduce((a, b) => a + b, 0) / months.length : 0;
+  }, [spendRows]);
+
+  // month options
+  const monthOptions = useMemo(() => {
+    const set = new Set(expenses.map((e) => toYearMonth(e.date)));
+    set.add(currentMonth);
+    return Array.from(set).sort().reverse();
+  }, [expenses, currentMonth]);
+
+  // selected month data
+  const monthSpendRows = useMemo(() =>
+    spendRows.filter((e) => toYearMonth(e.date) === selectedMonth),
+    [spendRows, selectedMonth]
+  );
+
+  const monthTotal = useMemo(() =>
+    monthSpendRows.reduce((s, e) => s + parseFloat(e.amount), 0),
+    [monthSpendRows]
+  );
+
+  const categoryTotals = useMemo(() => {
+    const bycat: Record<string, number> = {};
+    monthSpendRows.forEach((e) => {
+      bycat[e.category] = (bycat[e.category] || 0) + parseFloat(e.amount);
+    });
+    return Object.entries(bycat)
+      .map(([category, total]) => ({ category, total }))
+      .sort((a, b) => b.total - a.total);
+  }, [monthSpendRows]);
 
   async function handleCreate(data: ExpenseCreate) {
     await expenseApi.create(data);
@@ -56,13 +144,46 @@ export default function ExpensesPage() {
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <h1 className="text-2xl font-semibold text-gray-900">Expenses</h1>
-        <button
-          onClick={() => setShowForm(true)}
-          className="px-4 py-2 bg-indigo-600 text-white text-sm rounded-md hover:bg-indigo-700 transition-colors"
-        >
-          + Add
-        </button>
+        <div className="flex gap-2">
+          <button
+            onClick={() => { setShowNewCategory(true); setShowForm(false); }}
+            className="px-4 py-2 bg-white border border-gray-200 text-gray-700 text-sm rounded-md hover:bg-gray-50 transition-colors"
+          >
+            + Category
+          </button>
+          <button
+            onClick={() => { setShowForm(true); setShowNewCategory(false); }}
+            className="px-4 py-2 bg-indigo-600 text-white text-sm rounded-md hover:bg-indigo-700 transition-colors"
+          >
+            + Add
+          </button>
+        </div>
       </div>
+
+      {showNewCategory && (
+        <div className="bg-white border border-gray-200 rounded-xl p-6">
+          <h2 className="text-lg font-medium text-gray-900 mb-4">New Category</h2>
+          <form onSubmit={handleCreateCategory} className="flex gap-3 items-start">
+            <div className="flex-1">
+              <input
+                type="text"
+                value={newCategoryName}
+                onChange={(e) => setNewCategoryName(e.target.value)}
+                placeholder="e.g. subscriptions"
+                required
+                className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
+              />
+              {categoryError && <p className="text-xs text-red-600 mt-1">{categoryError}</p>}
+            </div>
+            <button type="submit" className="px-4 py-2 text-sm bg-indigo-600 text-white rounded-md hover:bg-indigo-700 transition-colors">
+              Save
+            </button>
+            <button type="button" onClick={() => { setShowNewCategory(false); setCategoryError(""); }} className="px-4 py-2 text-sm border border-gray-300 rounded-md hover:bg-gray-50 transition-colors">
+              Cancel
+            </button>
+          </form>
+        </div>
+      )}
 
       {error && <p className="text-sm text-red-600 bg-red-50 rounded-md p-3">{error}</p>}
 
@@ -73,78 +194,73 @@ export default function ExpensesPage() {
           </h2>
           <ExpenseForm
             initial={editing ?? undefined}
+            categories={categories}
             onSubmit={editing ? handleUpdate : handleCreate}
-            onCancel={() => {
-              setShowForm(false);
-              setEditing(null);
-            }}
+            onCancel={() => { setShowForm(false); setEditing(null); }}
           />
         </div>
       )}
 
-      {stats && (
-        <div className="grid grid-cols-3 gap-4">
-          <div className="bg-white border border-gray-200 rounded-xl p-4">
-            <p className="text-sm text-gray-500">Total spent</p>
-            <p className="text-3xl font-semibold text-gray-900">₹{stats.total_spent}</p>
-          </div>
-          <div className="bg-white border border-gray-200 rounded-xl p-4">
-            <p className="text-sm text-gray-500">Daily average</p>
-            <p className="text-3xl font-semibold text-gray-900">₹{stats.daily_average}</p>
-          </div>
-          <div className="bg-white border border-gray-200 rounded-xl p-4">
-            <p className="text-sm text-gray-500">Categories</p>
-            <p className="text-3xl font-semibold text-gray-900">{stats.by_category.length}</p>
-          </div>
+      {/* Top stats */}
+      <div className="grid grid-cols-3 gap-4">
+        <div className="bg-white border border-gray-200 rounded-xl p-4">
+          <p className="text-sm text-gray-500">This month's spend</p>
+          <p className="text-3xl font-semibold text-gray-900">{fmt(currentMonthSpend)}</p>
         </div>
-      )}
-
-      {stats && stats.by_category.length > 0 && (
-        <div className="bg-white border border-gray-200 rounded-xl p-6">
-          <h2 className="text-base font-medium text-gray-700 mb-4">By category</h2>
-          <ResponsiveContainer width="100%" height={200}>
-            <BarChart data={stats.by_category}>
-              <CartesianGrid strokeDasharray="3 3" />
-              <XAxis dataKey="category" tick={{ fontSize: 12 }} />
-              <YAxis tick={{ fontSize: 12 }} />
-              <Tooltip formatter={(v) => `₹${v}`} />
-              <Bar dataKey="total" fill="#6366f1" radius={[4, 4, 0, 0]} />
-            </BarChart>
-          </ResponsiveContainer>
+        <div className="bg-white border border-gray-200 rounded-xl p-4">
+          <p className="text-sm text-gray-500">Avg monthly spend</p>
+          <p className="text-3xl font-semibold text-gray-900">{fmt(Math.round(avgMonthlySpend))}</p>
         </div>
-      )}
+        <div className="bg-white border border-gray-200 rounded-xl p-4">
+          <p className="text-sm text-gray-500">This month's income</p>
+          <p className="text-3xl font-semibold text-green-600">{fmt(currentMonthIncome)}</p>
+        </div>
+      </div>
 
-      <div className="bg-white border border-gray-200 rounded-xl divide-y divide-gray-100">
-        {expenses.length === 0 && (
-          <p className="p-6 text-sm text-gray-500">No expenses yet.</p>
+      {/* Month selector + breakdown */}
+      <div className="bg-white border border-gray-200 rounded-xl p-6 space-y-5">
+        <div className="flex items-center gap-3">
+          <h2 className="text-base font-medium text-gray-700">Monthly breakdown</h2>
+          <select
+            value={selectedMonth}
+            onChange={(e) => setSelectedMonth(e.target.value)}
+            className="ml-auto text-sm border border-gray-200 rounded-md px-3 py-1.5 text-gray-700 focus:outline-none focus:ring-2 focus:ring-indigo-300"
+          >
+            {monthOptions.map((ym) => (
+              <option key={ym} value={ym}>{monthLabel(ym)}</option>
+            ))}
+          </select>
+        </div>
+
+        {categoryTotals.length === 0 ? (
+          <p className="text-sm text-gray-400">No expenses for this month.</p>
+        ) : (
+          <>
+            <ResponsiveContainer width="100%" height={200}>
+              <BarChart data={categoryTotals} margin={{ top: 0, right: 0, left: 0, bottom: 0 }}>
+                <CartesianGrid strokeDasharray="3 3" />
+                <XAxis dataKey="category" tick={{ fontSize: 12 }} />
+                <YAxis tick={{ fontSize: 12 }} />
+                <Tooltip formatter={(v: number) => fmt(v)} />
+                <Bar dataKey="total" fill="#6366f1" radius={[4, 4, 0, 0]} />
+              </BarChart>
+            </ResponsiveContainer>
+
+            <div className="flex items-center justify-between border-t border-gray-100 pt-4">
+              <span className="text-sm font-medium text-gray-700">Total</span>
+              <span className="text-lg font-semibold text-gray-900">{fmt(monthTotal)}</span>
+            </div>
+
+            <div className="divide-y divide-gray-100">
+              {categoryTotals.map(({ category, total }) => (
+                <div key={category} className="flex items-center justify-between py-2.5">
+                  <span className="text-sm text-gray-700 capitalize">{category}</span>
+                  <span className="text-sm font-medium text-gray-900">{fmt(total)}</span>
+                </div>
+              ))}
+            </div>
+          </>
         )}
-        {expenses.map((exp) => (
-          <div key={exp.id} className="px-6 py-4 flex items-center justify-between">
-            <div>
-              <p className="text-sm font-medium text-gray-900">
-                ₹{exp.amount} · {exp.category}
-              </p>
-              <p className="text-sm text-gray-500">
-                {exp.date}
-                {exp.description ? ` · ${exp.description}` : ""}
-              </p>
-            </div>
-            <div className="flex gap-2">
-              <button
-                onClick={() => setEditing(exp)}
-                className="text-sm text-indigo-600 hover:underline"
-              >
-                Edit
-              </button>
-              <button
-                onClick={() => handleDelete(exp.id)}
-                className="text-sm text-red-500 hover:underline"
-              >
-                Delete
-              </button>
-            </div>
-          </div>
-        ))}
       </div>
     </div>
   );
