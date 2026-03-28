@@ -49,6 +49,12 @@ export interface FitnessStats {
   active_days: number;
 }
 
+// Categories
+export interface Category {
+  id: number;
+  name: string;
+}
+
 // Expenses
 export interface Expense {
   id: number;

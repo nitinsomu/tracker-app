@@ -1,19 +1,18 @@
 import { useState } from "react";
-import type { Expense, ExpenseCreate } from "../../types";
-
-const CATEGORIES = ["Food", "Transport", "Housing", "Health", "Entertainment", "Shopping", "Other"];
+import type { Category, Expense, ExpenseCreate } from "../../types";
 
 interface Props {
   initial?: Expense;
+  categories: Category[];
   onSubmit: (data: ExpenseCreate) => Promise<void>;
   onCancel: () => void;
 }
 
-export default function ExpenseForm({ initial, onSubmit, onCancel }: Props) {
+export default function ExpenseForm({ initial, categories, onSubmit, onCancel }: Props) {
   const today = new Date().toISOString().split("T")[0];
   const [date, setDate] = useState(initial?.date ?? today);
   const [amount, setAmount] = useState(initial?.amount ?? "");
-  const [category, setCategory] = useState(initial?.category ?? CATEGORIES[0]);
+  const [category, setCategory] = useState(initial?.category ?? (categories[0]?.name ?? ""));
   const [description, setDescription] = useState(initial?.description ?? "");
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
@@ -64,8 +63,8 @@ export default function ExpenseForm({ initial, onSubmit, onCancel }: Props) {
           onChange={(e) => setCategory(e.target.value)}
           className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
         >
-          {CATEGORIES.map((c) => (
-            <option key={c}>{c}</option>
+          {categories.map((c) => (
+            <option key={c.id} value={c.name}>{c.name}</option>
           ))}
         </select>
       </div>
