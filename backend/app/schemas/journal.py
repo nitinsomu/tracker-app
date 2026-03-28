@@ -1,4 +1,5 @@
 from datetime import date, datetime
+from typing import Optional
 
 from pydantic import BaseModel
 
@@ -9,8 +10,8 @@ class JournalEntryCreate(BaseModel):
 
 
 class JournalEntryUpdate(BaseModel):
-    date: date | None = None
-    content: str | None = None
+    date: Optional[date] = None
+    content: Optional[str] = None
 
 
 class JournalEntryOut(BaseModel):

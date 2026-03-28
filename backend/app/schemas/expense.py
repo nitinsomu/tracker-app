@@ -1,5 +1,6 @@
 from datetime import date, datetime
 from decimal import Decimal
+from typing import Optional
 
 from pydantic import BaseModel
 
@@ -8,14 +9,14 @@ class ExpenseCreate(BaseModel):
     date: date
     amount: Decimal
     category: str
-    description: str | None = None
+    description: Optional[str] = None
 
 
 class ExpenseUpdate(BaseModel):
-    date: date | None = None
-    amount: Decimal | None = None
-    category: str | None = None
-    description: str | None = None
+    date: Optional[date] = None
+    amount: Optional[Decimal] = None
+    category: Optional[str] = None
+    description: Optional[str] = None
 
 
 class ExpenseOut(BaseModel):
@@ -23,7 +24,7 @@ class ExpenseOut(BaseModel):
     date: date
     amount: Decimal
     category: str
-    description: str | None
+    description: Optional[str]
     created_at: datetime
 
     model_config = {"from_attributes": True}

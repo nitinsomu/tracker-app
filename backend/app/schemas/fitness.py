@@ -1,18 +1,19 @@
 from datetime import date, datetime
+from typing import List, Optional
 
 from pydantic import BaseModel
 
 
 class FitnessLogCreate(BaseModel):
     date: date
-    activities: list[str]
+    activities: List[str]
     body_weight_kg: float
 
 
 class FitnessLogUpdate(BaseModel):
-    date: date | None = None
-    activities: list[str] | None = None
-    body_weight_kg: float | None = None
+    date: Optional[date] = None
+    activities: Optional[List[str]] = None
+    body_weight_kg: Optional[float] = None
 
 
 class FitnessLogOut(BaseModel):
