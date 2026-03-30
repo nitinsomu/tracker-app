@@ -6,6 +6,8 @@ import type { Category, Expense, ExpenseCreate } from "../../types";
 import {
   BarChart,
   Bar,
+  LineChart,
+  Line,
   XAxis,
   YAxis,
   CartesianGrid,
@@ -91,6 +93,22 @@ export default function ExpensesPage() {
     });
     const months = Object.values(byMonth);
     return months.length ? months.reduce((a, b) => a + b, 0) / months.length : 0;
+  }, [spendRows]);
+
+  // monthly trend (spend only, chronological)
+  const monthlyTrend = useMemo(() => {
+    const byMonth: Record<string, number> = {};
+    spendRows.forEach((e) => {
+      const ym = toYearMonth(e.date);
+      byMonth[ym] = (byMonth[ym] || 0) + parseFloat(e.amount);
+    });
+    return Object.entries(byMonth)
+      .sort(([a], [b]) => a.localeCompare(b))
+      .map(([ym, total]) => {
+        const [y, m] = ym.split("-").map(Number);
+        const label = new Date(y, m - 1, 1).toLocaleString("default", { month: "short", year: "2-digit" });
+        return { label, total: Math.round(total) };
+      });
   }, [spendRows]);
 
   // month options
@@ -216,6 +234,22 @@ export default function ExpensesPage() {
           <p className="text-3xl font-semibold text-green-600">{fmt(currentMonthIncome)}</p>
         </div>
       </div>
+
+      {/* Monthly spend trend */}
+      {monthlyTrend.length > 1 && (
+        <div className="bg-white border border-gray-200 rounded-xl p-6">
+          <h2 className="text-base font-medium text-gray-700 mb-4">Monthly spend trend</h2>
+          <ResponsiveContainer width="100%" height={200}>
+            <LineChart data={monthlyTrend} margin={{ top: 0, right: 8, left: 0, bottom: 0 }}>
+              <CartesianGrid strokeDasharray="3 3" />
+              <XAxis dataKey="label" tick={{ fontSize: 12 }} />
+              <YAxis tick={{ fontSize: 12 }} />
+              <Tooltip formatter={(v: number) => fmt(v)} />
+              <Line type="monotone" dataKey="total" stroke="#6366f1" dot={{ r: 3 }} activeDot={{ r: 5 }} />
+            </LineChart>
+          </ResponsiveContainer>
+        </div>
+      )}
 
       {/* Month selector + breakdown */}
       <div className="bg-white border border-gray-200 rounded-xl p-6 space-y-5">
