@@ -38,6 +38,14 @@ export default function ExpensesPage() {
   const [categoryError, setCategoryError] = useState("");
   const [error, setError] = useState("");
 
+  const lastUpdated = useMemo(() => {
+    if (!expenses.length) return null;
+    const latest = expenses.reduce((a, b) =>
+      new Date(a.created_at) > new Date(b.created_at) ? a : b
+    );
+    return new Date(latest.created_at);
+  }, [expenses]);
+
   const currentMonth = toYearMonth(new Date().toISOString().slice(0, 10));
   const [selectedMonth, setSelectedMonth] = useState(currentMonth);
   const [trendView, setTrendView] = useState<"total" | "category">("total");
@@ -202,7 +210,15 @@ export default function ExpensesPage() {
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-semibold text-gray-900">Expenses</h1>
+        <div>
+          <h1 className="text-2xl font-semibold text-gray-900">Expenses</h1>
+          {lastUpdated && (
+            <p className="text-xs text-gray-400 mt-0.5">
+              Last updated{" "}
+              {lastUpdated.toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" })}
+            </p>
+          )}
+        </div>
         <div className="flex gap-2">
           <button
             onClick={() => { setShowNewCategory(true); setShowForm(false); }}
