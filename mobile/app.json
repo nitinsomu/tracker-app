@@ -1,6 +1,6 @@
 {
   "expo": {
-    "name": "mobile",
+    "name": "tracker",
     "slug": "mobile",
     "scheme": "tracker",
     "version": "1.0.0",

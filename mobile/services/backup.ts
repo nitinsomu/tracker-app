@@ -33,18 +33,20 @@ interface BackupData {
 export async function exportBackup(): Promise<void> {
   const db = await getDb();
 
-  const [categories, fitnessRaw, expenses, journal] = await Promise.all([
-    db.getAllAsync<{ id: number; name: string }>('SELECT * FROM categories ORDER BY id'),
-    db.getAllAsync<{ id: number; date: string; activities: string; body_weight_kg: number; created_at: string }>(
-      'SELECT * FROM fitness_logs ORDER BY id'
-    ),
-    db.getAllAsync<{ id: number; date: string; amount: number; category: string; description: string | null; created_at: string }>(
-      'SELECT * FROM expenses ORDER BY id'
-    ),
-    db.getAllAsync<{ id: number; date: string; content: string; created_at: string }>(
-      'SELECT * FROM journal_entries ORDER BY id'
-    ),
-  ]);
+  // Sequential queries — concurrent getAllAsync on the same connection causes
+  // NullPointerException in prepareAsync on Android (expo-sqlite v16).
+  const categories = await db.getAllAsync<{ id: number; name: string }>(
+    'SELECT * FROM categories ORDER BY id'
+  );
+  const fitnessRaw = await db.getAllAsync<{
+    id: number; date: string; activities: string; body_weight_kg: number; created_at: string;
+  }>('SELECT * FROM fitness_logs ORDER BY id');
+  const expenses = await db.getAllAsync<{
+    id: number; date: string; amount: number; category: string; description: string | null; created_at: string;
+  }>('SELECT * FROM expenses ORDER BY id');
+  const journal = await db.getAllAsync<{
+    id: number; date: string; content: string; created_at: string;
+  }>('SELECT * FROM journal_entries ORDER BY id');
 
   const backup: BackupData = {
     version: 1,
@@ -99,14 +101,22 @@ export async function importBackup(): Promise<{ counts: Record<string, number> }
 
   const db = await getDb();
 
-  await db.withTransactionAsync(async () => {
-    await db.runAsync('DELETE FROM categories');
-    await db.runAsync('DELETE FROM fitness_logs');
-    await db.runAsync('DELETE FROM expenses');
-    await db.runAsync('DELETE FROM journal_entries');
+  // withTransactionAsync causes NullPointerException on Android (expo-sqlite v16)
+  // when many sequential runAsync calls are made inside the callback.
+  // Use explicit BEGIN/COMMIT/ROLLBACK instead.
+  try {
+    await db.execAsync('BEGIN TRANSACTION');
+
+    await db.execAsync('DELETE FROM categories');
+    await db.execAsync('DELETE FROM fitness_logs');
+    await db.execAsync('DELETE FROM expenses');
+    await db.execAsync('DELETE FROM journal_entries');
 
     for (const c of data.categories) {
-      await db.runAsync('INSERT OR REPLACE INTO categories (id, name) VALUES (?, ?)', [c.id, c.name]);
+      await db.runAsync(
+        'INSERT OR REPLACE INTO categories (id, name) VALUES (?, ?)',
+        [c.id, c.name]
+      );
     }
     for (const f of data.fitness_logs) {
       await db.runAsync(
@@ -126,7 +136,12 @@ export async function importBackup(): Promise<{ counts: Record<string, number> }
         [j.id, j.date, j.content, j.created_at]
       );
     }
-  });
+
+    await db.execAsync('COMMIT');
+  } catch (err) {
+    await db.execAsync('ROLLBACK');
+    throw err;
+  }
 
   return {
     counts: {

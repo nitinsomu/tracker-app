@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import {
   View, Text, TouchableOpacity, ScrollView, StyleSheet,
   RefreshControl, TextInput, ActivityIndicator,
@@ -32,6 +32,7 @@ export default function ExpensesScreen() {
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState('');
 
+  const scrollRef = useRef<InstanceType<typeof ScrollView>>(null);
   const currentMonth = toYearMonth(new Date().toISOString().slice(0, 10));
   const [selectedMonth, setSelectedMonth] = useState(currentMonth);
   const [trendView, setTrendView] = useState<'total' | 'category'>('total');
@@ -39,7 +40,8 @@ export default function ExpensesScreen() {
 
   async function load() {
     try {
-      const [e, c] = await Promise.all([listExpenses(), listCategories()]);
+      const e = await listExpenses();
+      const c = await listCategories();
       setExpenses(e);
       setCategories(c);
       setError('');
@@ -136,19 +138,20 @@ export default function ExpensesScreen() {
     }));
   }, [monthSpendRows]);
 
-  async function handleCreate(data: ExpenseCreate) { await createExpense(data); setShowForm(false); load(); }
+  async function handleCreate(data: ExpenseCreate) { await createExpense(data); setShowForm(false); await load(); }
   async function handleUpdate(data: ExpenseCreate) {
     if (!editing) return;
-    await updateExpense(editing.id, data); setEditing(null); load();
+    await updateExpense(editing.id, data); setEditing(null); await load();
   }
   async function handleDeleteConfirm() {
     if (!deleteTarget) return;
-    await deleteExpense(deleteTarget.id); setDeleteTarget(null); load();
+    await deleteExpense(deleteTarget.id); setDeleteTarget(null); await load();
   }
 
   return (
     <SafeAreaView style={styles.safe} edges={['bottom']}>
       <ScrollView
+        ref={scrollRef}
         style={styles.scroll}
         contentContainerStyle={styles.content}
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={colors.indigo[500]} />}
@@ -294,7 +297,7 @@ export default function ExpensesScreen() {
                           {!!e.description && <Text style={styles.expenseDesc} numberOfLines={1}>{e.description}</Text>}
                         </View>
                         <Text style={styles.expenseAmt}>{fmt(e.amount)}</Text>
-                        <TouchableOpacity onPress={() => { setEditing(e); setShowForm(false); }}>
+                        <TouchableOpacity onPress={() => { setEditing(e); setShowForm(false); scrollRef.current?.scrollTo({ y: 0, animated: true }); }}>
                           <Text style={styles.editLink}>Edit</Text>
                         </TouchableOpacity>
                         <TouchableOpacity onPress={() => setDeleteTarget(e)}>

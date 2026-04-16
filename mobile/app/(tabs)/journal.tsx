@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { View, Text, TouchableOpacity, ScrollView, StyleSheet, RefreshControl } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import Card from '../../components/ui/Card';
@@ -10,6 +10,7 @@ import { colors } from '../../constants/colors';
 import type { JournalEntry, JournalEntryCreate } from '../../types';
 
 export default function JournalScreen() {
+  const scrollRef = useRef<InstanceType<typeof ScrollView>>(null);
   const [entries, setEntries] = useState<JournalEntry[]>([]);
   const [showForm, setShowForm] = useState(false);
   const [editing, setEditing] = useState<JournalEntry | null>(null);
@@ -33,26 +34,27 @@ export default function JournalScreen() {
   async function handleCreate(data: JournalEntryCreate) {
     await createEntry(data);
     setShowForm(false);
-    load();
+    await load();
   }
 
   async function handleUpdate(data: JournalEntryCreate) {
     if (!editing) return;
     await updateEntry(editing.id, data);
     setEditing(null);
-    load();
+    await load();
   }
 
   async function handleDeleteConfirm() {
     if (!deleteTarget) return;
     await deleteEntry(deleteTarget.id);
     setDeleteTarget(null);
-    load();
+    await load();
   }
 
   return (
     <SafeAreaView style={styles.safe} edges={['bottom']}>
       <ScrollView
+        ref={scrollRef}
         style={styles.scroll}
         contentContainerStyle={styles.content}
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={colors.indigo[500]} />}
@@ -92,7 +94,7 @@ export default function JournalScreen() {
           <JournalCard
             key={entry.id}
             entry={entry}
-            onEdit={() => { setEditing(entry); setShowForm(false); }}
+            onEdit={() => { setEditing(entry); setShowForm(false); scrollRef.current?.scrollTo({ y: 0, animated: true }); }}
             onDelete={() => setDeleteTarget(entry)}
           />
         ))}

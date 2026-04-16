@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import {
   View, Text, TouchableOpacity, ScrollView, StyleSheet, RefreshControl,
 } from 'react-native';
@@ -25,12 +25,14 @@ export default function FitnessScreen() {
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState('');
 
+  const scrollRef = useRef<InstanceType<typeof ScrollView>>(null);
   const currentMonth = toYearMonth(new Date().toISOString().slice(0, 10));
   const [selectedMonth, setSelectedMonth] = useState(currentMonth);
 
   async function load() {
     try {
-      const [l, s] = await Promise.all([listLogs(), getFitnessStats()]);
+      const l = await listLogs();
+      const s = await getFitnessStats(l);
       setLogs(l);
       setStats(s);
       setError('');
@@ -63,26 +65,27 @@ export default function FitnessScreen() {
   async function handleCreate(data: FitnessLogCreate) {
     await createLog(data);
     setShowForm(false);
-    load();
+    await load();
   }
 
   async function handleUpdate(data: FitnessLogCreate) {
     if (!editing) return;
     await updateLog(editing.id, data);
     setEditing(null);
-    load();
+    await load();
   }
 
   async function handleDeleteConfirm() {
     if (!deleteTarget) return;
     await deleteLog(deleteTarget.id);
     setDeleteTarget(null);
-    load();
+    await load();
   }
 
   return (
     <SafeAreaView style={styles.safe} edges={['bottom']}>
       <ScrollView
+        ref={scrollRef}
         style={styles.scroll}
         contentContainerStyle={styles.content}
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={colors.indigo[500]} />}
@@ -160,7 +163,7 @@ export default function FitnessScreen() {
                     <Text style={styles.logWeight}>{log.body_weight_kg} kg</Text>
                   </View>
                   <View style={styles.logActions}>
-                    <TouchableOpacity onPress={() => { setEditing(log); setShowForm(false); }}>
+                    <TouchableOpacity onPress={() => { setEditing(log); setShowForm(false); scrollRef.current?.scrollTo({ y: 0, animated: true }); }}>
                       <Text style={styles.editLink}>Edit</Text>
                     </TouchableOpacity>
                     <TouchableOpacity onPress={() => setDeleteTarget(log)}>

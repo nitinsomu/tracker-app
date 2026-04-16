@@ -23,13 +23,15 @@ export default function CategoryBarChart({ data }: Props) {
       {data.map(({ category, total }) => {
         const pct = max > 0 ? total / max : 0;
         return (
-          <View key={category} style={styles.row}>
-            <Text style={styles.label}>{category}</Text>
+          <View key={category} style={styles.item}>
+            <View style={styles.labelRow}>
+              <Text style={styles.label} numberOfLines={1}>{category}</Text>
+              <Text style={styles.value}>{fmt(Math.round(total))}</Text>
+            </View>
             <View style={styles.barBg}>
               <View style={[styles.barFill, { flex: pct }]} />
               <View style={{ flex: 1 - pct }} />
             </View>
-            <Text style={styles.value}>{fmt(Math.round(total))}</Text>
           </View>
         );
       })}
@@ -39,13 +41,14 @@ export default function CategoryBarChart({ data }: Props) {
 
 const styles = StyleSheet.create({
   container: { gap: 10 },
-  row: { flexDirection: 'row', alignItems: 'center', gap: 8 },
-  label: { width: 90, fontSize: 12, color: colors.gray[600], textTransform: 'capitalize' },
+  item: { gap: 4 },
+  labelRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
+  label: { fontSize: 12, color: colors.gray[600], textTransform: 'capitalize', flex: 1, marginRight: 8 },
   barBg: {
-    flex: 1, height: 10, borderRadius: 5,
+    height: 10, borderRadius: 5,
     backgroundColor: colors.gray[100],
     flexDirection: 'row', overflow: 'hidden',
   },
   barFill: { backgroundColor: colors.indigo[500], borderRadius: 5 },
-  value: { width: 80, fontSize: 12, color: colors.gray[700], fontWeight: '500', textAlign: 'right' },
+  value: { fontSize: 12, color: colors.gray[700], fontWeight: '500' },
 });
