@@ -121,9 +121,9 @@ const styles = StyleSheet.create({
   },
   pickerWrapper: {
     borderWidth: 1, borderColor: colors.gray[300], borderRadius: 8,
-    backgroundColor: colors.white, overflow: 'hidden',
+    backgroundColor: colors.white, justifyContent: 'center',
   },
-  picker: { height: 44, color: colors.gray[900] },
+  picker: { height: 52, color: colors.gray[900] },
   actions: { flexDirection: 'row', gap: 10, justifyContent: 'flex-end', marginTop: 4 },
   cancelBtn: { borderWidth: 1, borderColor: colors.gray[300], borderRadius: 8, paddingHorizontal: 18, paddingVertical: 10 },
   cancelText: { fontSize: 14, color: colors.gray[700] },

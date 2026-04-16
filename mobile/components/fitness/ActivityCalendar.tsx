@@ -1,5 +1,5 @@
 import { useState, useMemo } from 'react';
-import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
+import { View, Text, TouchableOpacity, StyleSheet, useWindowDimensions } from 'react-native';
 import { colors } from '../../constants/colors';
 import type { FitnessLog } from '../../types';
 
@@ -12,6 +12,9 @@ interface Props {
 const DOW_LABELS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
 
 export default function ActivityCalendar({ year, month, logs }: Props) {
+  const { width } = useWindowDimensions();
+  // page padding 16×2 + card padding 16×2 = 64
+  const cellSize = Math.floor((width - 64) / 7);
   const [activeActivity, setActiveActivity] = useState<string | null>(null);
 
   const logByDate = useMemo(() => {
@@ -87,13 +90,13 @@ export default function ActivityCalendar({ year, month, logs }: Props) {
       {/* Calendar grid */}
       <View style={styles.grid}>
         {DOW_LABELS.map((d) => (
-          <View key={d} style={styles.cell}>
+          <View key={d} style={[styles.cell, { width: cellSize, height: cellSize }]}>
             <Text style={styles.dowLabel}>{d}</Text>
           </View>
         ))}
-        {blanks.map((_, i) => <View key={`b${i}`} style={styles.cell} />)}
+        {blanks.map((_, i) => <View key={`b${i}`} style={[styles.cell, { width: cellSize, height: cellSize }]} />)}
         {days.map((day) => (
-          <View key={day} style={styles.cell}>
+          <View key={day} style={[styles.cell, { width: cellSize, height: cellSize }]}>
             <View style={[styles.dayCell, dayStyle(day)]}>
               <Text style={dayTextStyle(day)}>{day}</Text>
             </View>
@@ -135,7 +138,7 @@ const styles = StyleSheet.create({
   chipCount: { fontWeight: '600' },
   emptyText: { fontSize: 13, color: colors.gray[400] },
   grid: { flexDirection: 'row', flexWrap: 'wrap' },
-  cell: { width: `${100 / 7}%`, aspectRatio: 1, padding: 2 },
+  cell: { padding: 2 },
   dayCell: { flex: 1, justifyContent: 'center', alignItems: 'center', borderRadius: 6 },
   dayEmpty: { backgroundColor: colors.gray[50] },
   dayActive: { backgroundColor: colors.indigo[100] },

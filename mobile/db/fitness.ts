@@ -67,8 +67,8 @@ export async function deleteLog(id: number): Promise<void> {
   await db.runAsync('DELETE FROM fitness_logs WHERE id = ?', [id]);
 }
 
-export async function getFitnessStats(): Promise<FitnessStats> {
-  const rows = await listLogs();
+export async function getFitnessStats(preloadedLogs?: FitnessLog[]): Promise<FitnessStats> {
+  const rows = preloadedLogs ?? await listLogs();
 
   const weightTrend: WeightPoint[] = rows
     .map((r) => ({ date: r.date, body_weight_kg: r.body_weight_kg }))
