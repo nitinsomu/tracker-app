@@ -99,11 +99,13 @@ export async function importBackup(): Promise<{ counts: Record<string, number> }
 
   const db = await getDb();
 
-  await db.withTransactionAsync(async () => {
-    await db.runAsync('DELETE FROM categories');
-    await db.runAsync('DELETE FROM fitness_logs');
-    await db.runAsync('DELETE FROM expenses');
-    await db.runAsync('DELETE FROM journal_entries');
+  try {
+    await db.execAsync('BEGIN TRANSACTION');
+
+    await db.execAsync('DELETE FROM categories');
+    await db.execAsync('DELETE FROM fitness_logs');
+    await db.execAsync('DELETE FROM expenses');
+    await db.execAsync('DELETE FROM journal_entries');
 
     for (const c of data.categories) {
       await db.runAsync('INSERT OR REPLACE INTO categories (id, name) VALUES (?, ?)', [c.id, c.name]);
@@ -126,7 +128,12 @@ export async function importBackup(): Promise<{ counts: Record<string, number> }
         [j.id, j.date, j.content, j.created_at]
       );
     }
-  });
+
+    await db.execAsync('COMMIT');
+  } catch (err) {
+    await db.execAsync('ROLLBACK');
+    throw err;
+  }
 
   return {
     counts: {
