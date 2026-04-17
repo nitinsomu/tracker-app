@@ -101,47 +101,40 @@ export async function importBackup(): Promise<{ counts: Record<string, number> }
 
   const db = await getDb();
 
-  // withTransactionAsync causes NullPointerException on Android (expo-sqlite v16)
-  // when many sequential runAsync calls are made inside the callback.
-  // Use explicit BEGIN/COMMIT/ROLLBACK instead.
-  try {
-    await db.execAsync('BEGIN TRANSACTION');
-
-    await db.execAsync('DELETE FROM categories');
-    await db.execAsync('DELETE FROM fitness_logs');
-    await db.execAsync('DELETE FROM expenses');
-    await db.execAsync('DELETE FROM journal_entries');
+  // withExclusiveTransactionAsync pins all operations to the single connection
+  // that holds the lock, avoiding NullPointerException from connection-switching
+  // that occurs with withTransactionAsync or manual BEGIN/execAsync on Android.
+  await db.withExclusiveTransactionAsync(async (txn) => {
+    await txn.runAsync('DELETE FROM categories');
+    await txn.runAsync('DELETE FROM fitness_logs');
+    await txn.runAsync('DELETE FROM expenses');
+    await txn.runAsync('DELETE FROM journal_entries');
 
     for (const c of data.categories) {
-      await db.runAsync(
+      await txn.runAsync(
         'INSERT OR REPLACE INTO categories (id, name) VALUES (?, ?)',
         [c.id, c.name]
       );
     }
     for (const f of data.fitness_logs) {
-      await db.runAsync(
+      await txn.runAsync(
         'INSERT OR REPLACE INTO fitness_logs (id, date, activities, body_weight_kg, created_at) VALUES (?, ?, ?, ?, ?)',
         [f.id, f.date, JSON.stringify(f.activities), f.body_weight_kg, f.created_at]
       );
     }
     for (const e of data.expenses) {
-      await db.runAsync(
+      await txn.runAsync(
         'INSERT OR REPLACE INTO expenses (id, date, amount, category, description, created_at) VALUES (?, ?, ?, ?, ?, ?)',
         [e.id, e.date, e.amount, e.category, e.description ?? null, e.created_at]
       );
     }
     for (const j of data.journal_entries) {
-      await db.runAsync(
+      await txn.runAsync(
         'INSERT OR REPLACE INTO journal_entries (id, date, content, created_at) VALUES (?, ?, ?, ?)',
         [j.id, j.date, j.content, j.created_at]
       );
     }
-
-    await db.execAsync('COMMIT');
-  } catch (err) {
-    await db.execAsync('ROLLBACK');
-    throw err;
-  }
+  });
 
   return {
     counts: {
