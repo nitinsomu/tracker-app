@@ -2,7 +2,7 @@
 
 React Native (Expo) mobile app for tracking fitness, expenses, and journaling.
 
-- Runs on **Android and iOS**
+- Runs on **Android**
 - **Fully local** — no server, no internet required, data stored on-device with SQLite
 - **Backup/restore** via JSON export to Google Drive / iCloud
 
@@ -22,81 +22,74 @@ React Native (Expo) mobile app for tracking fitness, expenses, and journaling.
 
 ---
 
-## Development — Expo Go
+## Requirements
 
-The fastest way to run the app during development. No build required.
+- Node.js 18+
+- Android Studio (for SDK and emulator)
+- `ANDROID_HOME` environment variable set to `C:\Users\<you>\AppData\Local\Android\Sdk`
+- `C:\Users\<you>\AppData\Local\Android\Sdk\platform-tools` added to system `Path`
 
-**Requirements:** Node.js 18+, [Expo Go](https://expo.dev/go) installed on your phone.
-
-```bash
-cd mobile
-npm install --legacy-peer-deps
-npx expo start --clear
-```
-
-Scan the QR code with Expo Go. Your phone and laptop must be on the same WiFi network.
-
-If they are on different networks:
-```bash
-npx expo start --tunnel
-```
-
-> **Note:** `expo-notifications` is partially restricted in Expo Go. All other features (fitness, expenses, journal, backup) work fully.
+> Set both in **System Properties → Environment Variables → System variables**, then restart your terminal.
 
 ---
 
-## Building a standalone APK — EAS Build
+## Development (live reload)
 
-EAS Build compiles the app in Expo's cloud. No Android Studio needed.
+Phone must be connected via USB with **USB debugging** enabled.
 
-### One-time setup
-
-```bash
-# Install EAS CLI globally
-npm install -g eas-cli
-
-# Log in to your Expo account (create one free at expo.dev)
-eas login
-
-# Link this project to your account (already configured — skip if eas.json exists)
-eas init
-```
-
-### Build an APK (Android)
-
-```bash
+```powershell
 cd mobile
-eas build --platform android --profile preview
+npm install --legacy-peer-deps
+npx expo run:android
 ```
 
-- Build takes ~10-15 minutes on Expo's servers
-- When complete, you'll get a download link for the `.apk` file
-- Download it to your Android phone and tap to install
-  - You may need to enable **Install from unknown sources** in Android settings
+This builds a debug APK, installs it on your phone, and starts Metro. JS changes reload instantly without rebuilding.
 
-### Build profiles
+---
 
-| Profile       | Output  | Use case                                      |
-|---------------|---------|-----------------------------------------------|
-| `preview`     | `.apk`  | Install directly on your phone, share with others |
-| `development` | `.apk`  | Dev build with full debugger (replaces Expo Go) |
-| `production`  | `.aab`  | Play Store submission                         |
+## Building a standalone release APK
 
-```bash
-# Development build (full native module support, replaces Expo Go)
-eas build --platform android --profile development
+A release APK runs standalone — no PC or Metro needed after install.
 
-# Production build (for Play Store)
-eas build --platform android --profile production
+### 1. Generate native Android project
+
+Only needed the first time, or when `app.json` changes or native libraries are added/removed.
+
+```powershell
+cd mobile
+npx expo prebuild --platform android --clean
 ```
 
-### iOS build
+After prebuild, recreate `local.properties` (PowerShell):
 
-Requires an Apple Developer account ($99/year) and a Mac (or EAS cloud signing).
-
-```bash
-eas build --platform ios --profile preview
+```powershell
+[System.IO.File]::WriteAllText(
+  'C:/Users/<you>/Desktop/Projects/tracker-app/mobile/android/local.properties',
+  "sdk.dir=C\:/Users/<you>/AppData/Local/Android/Sdk`n",
+  [System.Text.Encoding]::ASCII
+)
 ```
+
+Replace `<you>` with your Windows username.
+
+### 2. Build the APK
+
+```powershell
+cd mobile/android
+.\gradlew assembleRelease
+```
+
+Output: `mobile/android/app/build/outputs/apk/release/app-release.apk`
+
+Build takes ~8-10 minutes on first run. Subsequent builds are faster (~1-2 min) if only JS changed.
+
+### 3. Install on phone (USB connected)
+
+```powershell
+& "C:\Users\<you>\AppData\Local\Android\Sdk\platform-tools\adb.exe" install -r mobile/android/app/build/outputs/apk/release/app-release.apk
+```
+
+Or send the APK to your phone via WhatsApp/email and tap to install (enable **Install from unknown sources** if prompted).
 
 ---
 
@@ -140,7 +133,7 @@ Settings (gear icon) → **Export backup (JSON)** → save to Google Drive / iCl
 ### Import
 Settings → **Import backup** → pick the `.json` file
 
-The backup format is a plain JSON file containing all 4 tables. Keep a copy after each session.
+The backup is a plain JSON file containing all 4 tables. Keep a copy after each session.
 
 ### Migrating from the web app
 
@@ -159,7 +152,9 @@ Then import `tracker_backup.json` via Settings → Import backup.
 
 | Error | Fix |
 |-------|-----|
+| `SDK location not found` | Recreate `local.properties` — see step 1 above |
+| `adb not recognized` | Add `platform-tools` to system Path, restart terminal |
+| `EBUSY: resource busy or locked` during prebuild | `Get-Process java \| Stop-Process -Force`, then retry |
+| App crashes on release build | Ensure `newArchEnabled: false` in `app.json` |
 | `Cannot find module 'babel-preset-expo'` | `npm install babel-preset-expo@~54.0.10 --save-dev --legacy-peer-deps` |
-| `Cannot find module 'react-native-worklets/plugin'` | `npx expo install react-native-worklets-core` |
-| SQLite `ensureDatabasePathExistsAsync` error | Clear Expo Go app data on Android: Settings → Apps → Expo Go → Storage → Clear Data |
-| QR code not connecting | Ensure phone and laptop are on the same WiFi, or use `npx expo start --tunnel` |
+| QR code not connecting | Phone and laptop must be on same WiFi |
