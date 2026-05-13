@@ -1,16 +1,11 @@
 import * as SQLite from 'expo-sqlite';
 
-let _db: SQLite.SQLiteDatabase | null = null;
+// Single promise shared across all callers. Guarantees tables exist before
+// any query runs, even if multiple screens mount simultaneously.
+let _ready: Promise<SQLite.SQLiteDatabase> | null = null;
 
-export async function getDb(): Promise<SQLite.SQLiteDatabase> {
-  if (!_db) {
-    _db = await SQLite.openDatabaseAsync('tracker.db');
-  }
-  return _db;
-}
-
-export async function initDatabase(): Promise<void> {
-  const db = await getDb();
+async function openAndInit(): Promise<SQLite.SQLiteDatabase> {
+  const db = await SQLite.openDatabaseAsync('tracker.db');
 
   await db.execAsync(`
     PRAGMA journal_mode = WAL;
@@ -50,4 +45,18 @@ export async function initDatabase(): Promise<void> {
 
     CREATE INDEX IF NOT EXISTS idx_journal_date ON journal_entries(date);
   `);
+
+  return db;
+}
+
+export function getDb(): Promise<SQLite.SQLiteDatabase> {
+  if (!_ready) {
+    _ready = openAndInit();
+  }
+  return _ready;
+}
+
+// Called from _layout.tsx to eagerly warm up the DB before tabs load.
+export async function initDatabase(): Promise<void> {
+  await getDb();
 }

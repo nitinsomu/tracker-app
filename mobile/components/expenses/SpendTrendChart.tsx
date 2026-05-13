@@ -23,7 +23,7 @@ export default function SpendTrendChart({ data }: Props) {
 
   const vals = data.map((d) => d.total);
   const minV = 0;
-  const maxV = Math.ceil(Math.max(...vals) * 1.1);
+  const maxV = Math.max(1, Math.ceil(Math.max(...vals) * 1.1));
 
   const xS = (i: number) => (i / (data.length - 1)) * w;
   const yS = (v: number) => h - (v / maxV) * h;

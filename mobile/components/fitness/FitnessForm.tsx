@@ -22,7 +22,7 @@ export default function FitnessForm({ initial, onSubmit, onCancel }: Props) {
   const [loading, setLoading] = useState(false);
 
   async function handleSubmit() {
-    if (!weight.trim()) { setError('Weight is required'); return; }
+    if (!weight.trim() || isNaN(parseFloat(weight))) { setError('Enter a valid weight'); return; }
     setError('');
     setLoading(true);
     try {

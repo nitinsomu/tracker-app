@@ -42,7 +42,7 @@ export async function updateEntry(id: number, data: JournalEntryUpdate): Promise
   if (fields.length > 0) {
     await db.runAsync(
       `UPDATE journal_entries SET ${fields.join(', ')} WHERE id = ?`,
-      [...params, String(id)]
+      [...params, id]
     );
   }
 
